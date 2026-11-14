@@ -25,9 +25,28 @@ Installing a separate GraalVM JDK is not needed just to resolve or load the Mave
 
 ## Polyglot context security and lifecycle
 
-`GraalVMConfig` exposes a singleton `Engine` and a context factory. Each call to `createContext()` creates a fresh context for JavaScript and Python, sharing the engine's reusable compilation resources without sharing context state. Callers must close contexts (for example, with try-with-resources).
+`GraalVMConfig` exposes a singleton `Engine` and a context factory. Each call to `createContext()` creates a fresh context for JavaScript and Python, and `createJavaScriptContext(OutputStream)` creates a JavaScript-only context that routes standard output and error to the supplied stream. Contexts share the engine's reusable compilation resources without sharing context state. The execution service creates a new context for every request and closes it with try-with-resources.
 
 Host access is explicitly disabled, Java host class lookup is denied, guest IO and native access are disabled, and guest-created threads are disabled. `allowAllAccess(true)` is not used. These settings are a starting boundary, not a complete sandbox for untrusted scripts; additional resource limits and process/container isolation are needed before accepting untrusted workloads.
+
+## JavaScript execution service
+
+`JavaScriptExecutionService.executeJavaScript(String)` evaluates one JavaScript source string and returns a `JavaScriptExecutionResult` with `success`, `result`, `output`, and `error` fields. The result is GraalVM's readable representation of the last evaluated value (for example, `"30"`); scripts that only print have the result `"undefined"`. Console output is captured per request. Syntax and runtime failures return `success: false` and a descriptive error instead of escaping as exceptions.
+
+Examples:
+
+```java
+executionService.executeJavaScript("console.log(\"Hello from PolyglotMesh\");");
+// success=true, result="undefined", output="Hello from PolyglotMesh"
+
+executionService.executeJavaScript("10 + 20");
+// success=true, result="30", output=""
+
+executionService.executeJavaScript("const a = 15; const b = 25; a + b");
+// success=true, result="40", output=""
+```
+
+The `Context` API evaluates code through `context.eval("js", code)`. The service reads the resulting `Value` with `toString()`, captures guest output in a request-local `ByteArrayOutputStream`, and relies on try-with-resources to close each context even when evaluation throws.
 
 ## References
 

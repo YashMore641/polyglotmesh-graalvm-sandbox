@@ -7,6 +7,8 @@ import org.graalvm.polyglot.io.IOAccess;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.io.OutputStream;
+
 @Configuration
 public class GraalVMConfig {
 
@@ -29,15 +31,25 @@ public class GraalVMConfig {
         }
 
         public Context createContext() {
-            return Context.newBuilder("js", "python")
+            return createBuilder("js", "python").build();
+        }
+
+        public Context createJavaScriptContext(OutputStream outputStream) {
+            return createBuilder("js")
+                    .out(outputStream)
+                    .err(outputStream)
+                    .build();
+        }
+
+        private Context.Builder createBuilder(String... languages) {
+            return Context.newBuilder(languages)
                     .engine(engine)
                     .allowAllAccess(false)
                     .allowHostAccess(HostAccess.NONE)
                     .allowHostClassLookup(className -> false)
                     .allowIO(IOAccess.NONE)
                     .allowCreateThread(false)
-                    .allowNativeAccess(false)
-                    .build();
+                    .allowNativeAccess(false);
         }
     }
 }
