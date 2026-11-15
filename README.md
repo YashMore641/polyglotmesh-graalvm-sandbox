@@ -2,7 +2,7 @@
 
 **PolyglotMesh – GraalVM Multi-Language Runtime Sandbox** is an individual internship project exploring how a backend can safely accept and manage scripts written in multiple languages through a common runtime platform. This repository is organized as a monorepo so the backend, future frontend, documentation, and sample scripts can evolve together.
 
-> **Project status:** Day 3 development. The backend provides a health endpoint and restricted JavaScript execution through GraalVM Polyglot. Persistence and the React frontend are not implemented.
+> **Project status:** Day 4 development. The backend provides a health endpoint and restricted JavaScript and Python execution through GraalVM Polyglot. Persistence and the React frontend are not implemented.
 
 ## Problem statement
 
@@ -15,6 +15,7 @@ Running scripts from different programming languages often requires separate run
 - Provide a small HTTP health check for local development and deployment checks.
 - Build toward a common interface for future language execution and sandbox management.
 - Execute JavaScript through a restricted, request-local GraalVM Polyglot context.
+- Execute Python through a restricted, isolated GraalVM Polyglot context.
 - Keep database integration out of the current backend.
 
 ## Repository layout
@@ -46,7 +47,7 @@ Only packages needed by the initial health endpoint contain source files. The re
 
 The initial backend is a Spring WebFlux application. HTTP requests are handled by controllers, which will delegate business operations to services as the project grows. DTOs define API payloads; future repository adapters can isolate persistence concerns. The future React frontend will communicate with the backend over HTTP.
 
-GraalVM's Polyglot API and JavaScript runtime are used by a service that evaluates each script in a fresh context with host access, host class lookup, guest IO, and native access disabled. MongoDB is a future integration and is not configured in this scaffold.
+GraalVM's Polyglot API, JavaScript runtime, and GraalPy runtime are used by services that evaluate each script in a fresh context with host access, host class lookup, guest IO, and native access disabled. MongoDB is a future integration and is not configured in this scaffold.
 
 ## Technology stack
 
@@ -57,7 +58,7 @@ GraalVM's Polyglot API and JavaScript runtime are used by a service that evaluat
 | Spring WebFlux | Reactive HTTP server and REST API foundation |
 | Spring Boot Validation | Bean validation for future API input models |
 | Maven | Backend build and dependency management |
-| GraalVM Polyglot | Restricted JavaScript execution with per-request context lifecycle |
+| GraalVM Polyglot | Restricted JavaScript and Python execution with per-request context lifecycle |
 | React | Planned frontend |
 | MongoDB | Planned persistence integration |
 
@@ -67,7 +68,7 @@ GraalVM's Polyglot API and JavaScript runtime are used by a service that evaluat
 - `spring-boot-starter-validation` provides Jakarta Bean Validation for validating future request DTOs.
 - `spring-boot-starter-test` provides Spring Boot and JUnit testing support.
 - `reactor-test` provides testing utilities for Reactor publishers used by WebFlux.
-- `polyglot` provides the GraalVM embedding API; `js-community` supplies the JavaScript runtime.
+- `polyglot` provides the GraalVM embedding API; `js-community` and `python-community` supply the JavaScript and GraalPy runtimes.
 
 ## Health endpoint
 
@@ -114,6 +115,21 @@ JavaScriptExecutionResult calculated = executionService.executeJavaScript("10 + 
 ```
 
 The result has `success`, `result`, `output`, and `error` fields. For example, invalid JavaScript returns `success: false` with a syntax-error message. This restricted context configuration is a starting point, not a complete isolation boundary for untrusted code; use process/container isolation and resource limits before exposing execution to untrusted workloads. See [docs/graalvm-setup.md](docs/graalvm-setup.md) for the configuration and API details.
+
+## Python execution
+
+`PythonExecutionService` executes Python through GraalVM's Polyglot API. Each call creates and closes an isolated Python context, with Python `print()` output captured in the result.
+
+```java
+PythonExecutionResult printed =
+        executionService.executePython("print(\"Hello from Python\")");
+// printed.output(): "Hello from Python\n"
+
+PythonExecutionResult calculated = executionService.executePython("10 + 20");
+// calculated.result(): "30"
+```
+
+The Python runtime is supplied by the Maven `python-community` dependency; GraalPy is not launched as an external Python process. The tested examples do not imply compatibility with arbitrary Python programs or native packages. See [docs/graalvm-setup.md](docs/graalvm-setup.md) for GraalPy version, runtime packaging, and compatibility details.
 
 Run the backend tests:
 

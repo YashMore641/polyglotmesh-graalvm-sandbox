@@ -4,7 +4,7 @@
 
 The backend targets Java 17 and Spring Boot 3.5.7. Spring Boot 3.5 requires Java 17 or newer. The Polyglot API and both language runtime dependencies use GraalVM component version `24.1.2`; the matching `js-community` and `python-community` artifacts are selected to keep all GraalVM components on one release line. The community artifacts avoid the Oracle GraalVM Free Terms and Conditions (GFTC) language artifacts.
 
-GraalVM's release notes identify language components `24.1.2` as designed for GraalVM for JDK 23. The Maven artifacts' base classes target Java 17 bytecode (with some multi-release classes for newer JDKs), so this component line preserves the project's Java 17 bytecode baseline. The supported GraalVM JDK pairing is not the same thing as the Java version targeted by this project. The project tests were run on Java 24.0.1 in this environment, not on a Java 17 runtime; run the test suite on the exact JDK distribution selected for deployment.
+GraalVM's release notes identify language components `24.1.2` as designed for GraalVM for JDK 23. The Maven artifacts' base classes target Java 17 bytecode (with some multi-release classes for newer JDKs), so this component line preserves the project's Java 17 bytecode baseline. The supported GraalVM JDK pairing is not the same thing as the Java version targeted by this project. The project tests were run on Oracle HotSpot JDK 24.0.1, not on GraalVM JDK or Java 17. The Python and JavaScript tests passed, but GraalVM warned that JVMCI was disabled and fell back to interpreter-only execution. Run the tests on the exact JDK distribution selected for deployment; the optimized GraalVM JDK pairing remains to be validated in this project.
 
 ## JVM and language runtimes
 
@@ -47,6 +47,30 @@ executionService.executeJavaScript("const a = 15; const b = 25; a + b");
 ```
 
 The `Context` API evaluates code through `context.eval("js", code)`. The service reads the resulting `Value` with `toString()`, captures guest output in a request-local `ByteArrayOutputStream`, and relies on try-with-resources to close each context even when evaluation throws.
+
+## GraalPy configuration and Python execution
+
+The backend includes the `org.graalvm.polyglot:python-community` runtime POM at the same `24.1.2` version as the Polyglot API and JavaScript runtime. Maven resolves GraalPy's language implementation and runtime resources; a separate CPython installation is not used. The runtime dependencies must remain on the application runtime classpath, including when packaging or deploying the Spring Boot application.
+
+`PythonExecutionService.executePython(String)` creates a fresh Python-only context per call, captures standard output and error, and closes the context after evaluation. It uses the same restricted context builder as the other language contexts: host access, host class lookup, guest IO, native access, and thread creation are disabled. Python `None` has no expression result and is returned as `null`; other final expression values are returned as strings. Syntax and runtime failures return a failed result with a categorized error.
+
+Examples:
+
+```java
+executionService.executePython("print(\"Hello from Python\")");
+// success=true, result=null, output="Hello from Python\n"
+
+executionService.executePython("print(10 + 20)");
+// success=true, result=null, output="30\n"
+
+executionService.executePython("numbers = [10, 20, 30]\nprint(sum(numbers))");
+// success=true, output="60\n"
+
+executionService.executePython("10 + 20");
+// success=true, result="30", output=""
+```
+
+The automated tests verify these examples, syntax and runtime error reporting, and state isolation between executions. This verifies the bundled GraalPy runtime on the tested JVM; it does not establish support for arbitrary third-party Python distributions, native Python extensions, or arbitrary Python programs. No extra package installation is needed for the built-in features exercised by these examples. Python package installation and native-extension support require separate compatibility and security validation. GraalPy `24.1.2` is designed for GraalVM for JDK 23 according to the linked release notes; the project test environment used Java 24.0.1, so that successful run alone does not certify every JVM distribution/version combination. Validate on the exact JDK and packaging path used in deployment.
 
 ## References
 

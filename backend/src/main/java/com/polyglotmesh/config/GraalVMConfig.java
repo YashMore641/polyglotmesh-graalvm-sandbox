@@ -41,6 +41,13 @@ public class GraalVMConfig {
                     .build();
         }
 
+        public Context createPythonContext(OutputStream outputStream) {
+            return createBuilder("python")
+                    .out(outputStream)
+                    .err(outputStream)
+                    .build();
+        }
+
         private Context.Builder createBuilder(String... languages) {
             return Context.newBuilder(languages)
                     .engine(engine)
