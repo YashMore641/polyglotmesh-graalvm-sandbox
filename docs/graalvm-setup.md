@@ -72,6 +72,12 @@ executionService.executePython("10 + 20");
 
 The automated tests verify these examples, syntax and runtime error reporting, and state isolation between executions. This verifies the bundled GraalPy runtime on the tested JVM; it does not establish support for arbitrary third-party Python distributions, native Python extensions, or arbitrary Python programs. No extra package installation is needed for the built-in features exercised by these examples. Python package installation and native-extension support require separate compatibility and security validation. GraalPy `24.1.2` is designed for GraalVM for JDK 23 according to the linked release notes; the project test environment used Java 24.0.1, so that successful run alone does not certify every JVM distribution/version combination. Validate on the exact JDK and packaging path used in deployment.
 
+## Common execution service
+
+`PolyglotExecutionService.execute(String language, String code)` routes `javascript` or `js` to the JavaScript service and `python` or `py` to the Python service. Matching is case-insensitive and ignores surrounding whitespace. The service rejects blank inputs, limits source code to 100,000 characters, and returns an `ExecutionResponse` with execution status, requested language, captured output (or the final expression value when there is no captured output), error details, and elapsed time in milliseconds. There is not yet a REST endpoint for this service.
+
+Language execution uses a new, restricted context for each call and closes it after evaluation. This does not impose CPU, memory, or wall-clock limits. Guest scripts can still run indefinitely or consume excessive memory, so context isolation and disabled host access are not sufficient protections for untrusted workloads. Add process/container isolation and explicit resource limits before accepting untrusted code.
+
 ## References
 
 - [GraalVM: Embedding Languages](https://www.graalvm.org/latest/reference-manual/embed-languages/) — Maven dependency setup, language POM artifacts, and context lifecycle.
