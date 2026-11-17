@@ -2,7 +2,7 @@
 
 **PolyglotMesh – GraalVM Multi-Language Runtime Sandbox** is an individual internship project exploring how a backend can safely accept and manage scripts written in multiple languages through a common runtime platform. This repository is organized as a monorepo so the backend, future frontend, documentation, and sample scripts can evolve together.
 
-> **Project status:** Day 5 development. The backend provides a health endpoint and a common service for restricted JavaScript and Python execution through GraalVM Polyglot. Persistence, the React frontend, and an execution REST endpoint are not implemented.
+> **Project status:** Day 6 development. The backend provides health and execution REST endpoints, with a common service for restricted JavaScript and Python execution through GraalVM Polyglot. Persistence and the React frontend are not implemented.
 
 ## Problem statement
 
@@ -17,6 +17,7 @@ Running scripts from different programming languages often requires separate run
 - Execute JavaScript through a restricted, request-local GraalVM Polyglot context.
 - Execute Python through a restricted, isolated GraalVM Polyglot context.
 - Route JavaScript and Python requests through a common language execution service.
+- Expose JavaScript and Python execution through a validated REST endpoint.
 - Keep database integration out of the current backend.
 
 ## Repository layout
@@ -42,7 +43,7 @@ com.polyglotmesh
 └── repository   # Persistence adapters
 ```
 
-Only packages needed by the initial health endpoint contain source files. The remaining package directories are reserved for later features.
+The controller, service, DTO, and exception packages contain the backend API and execution implementation. The model and repository packages remain reserved for future features.
 
 ## Architecture overview
 
@@ -132,11 +133,49 @@ PythonExecutionResult calculated = executionService.executePython("10 + 20");
 
 The Python runtime is supplied by the Maven `python-community` dependency; GraalPy is not launched as an external Python process. The tested examples do not imply compatibility with arbitrary Python programs or native packages. See [docs/graalvm-setup.md](docs/graalvm-setup.md) for GraalPy version, runtime packaging, and compatibility details.
 
+## Execution API
+
+Submit code to `POST http://localhost:8080/api/execute` with a JSON body containing `language` and `code`.
+
+Supported language values are `javascript`, `js`, `python`, and `py` (case-insensitive; surrounding whitespace is ignored). Both fields must be non-blank, and code is limited to 100,000 characters.
+
+JavaScript request:
+
+```json
+{
+  "language": "javascript",
+  "code": "console.log('Hello from PolyglotMesh');"
+}
+```
+
+Python request:
+
+```json
+{
+  "language": "python",
+  "code": "print('Hello from Python')"
+}
+```
+
+Successful requests return HTTP `200 OK` with the execution response:
+
+```json
+{
+  "success": true,
+  "language": "javascript",
+  "output": "Hello from PolyglotMesh\n",
+  "error": null,
+  "executionTimeMs": 12
+}
+```
+
+Invalid JSON, missing or blank fields, unsupported languages, or code over the size limit return HTTP `400 Bad Request`. The response uses the same fields, with `success` set to `false` and the reason in `error`. A valid request whose code fails during execution (for example, a syntax error) still returns HTTP `200 OK`; inspect `success` and `error` in the response to determine the execution outcome.
+
 ## Common multi-language execution service
 
 `PolyglotExecutionService.execute(String language, String code)` routes `javascript`/`js` to `JavaScriptExecutionService` and `python`/`py` to `PythonExecutionService`. Language matching ignores case and surrounding whitespace. It returns an `ExecutionResponse` containing `success`, the requested language, `output`, `error`, and `executionTimeMs`. Output is captured guest output when present, or otherwise the final expression result. Invalid code and unsupported or invalid inputs are returned as failed responses rather than escaping as guest execution exceptions. Source code is limited to 100,000 characters.
 
-API-ready service usage (there is no REST controller yet):
+The controller delegates execution to this service:
 
 ```java
 ExecutionResponse response = polyglotExecutionService.execute(
@@ -149,7 +188,7 @@ ExecutionResponse calculation = polyglotExecutionService.execute("py", "10 + 20"
 // success=true, language="py", output="30", error=null
 ```
 
-Each language-specific service creates and closes a fresh context per execution; guest contexts have no host access, host class lookup, IO, native access, or thread creation. These restrictions do not impose CPU or memory limits: an infinite loop or memory-intensive program can still consume resources or block an application thread. Context isolation alone is not a complete sandbox. Before exposing this service to untrusted users, execute scripts in separately constrained processes or containers with explicit CPU, memory, and wall-clock limits. This project intentionally does not expose a REST execution endpoint in this phase.
+Each language-specific service creates and closes a fresh context per execution; guest contexts have no host access, host class lookup, IO, native access, or thread creation. These restrictions do not impose CPU or memory limits: an infinite loop or memory-intensive program can still consume resources or block an application thread. Context isolation alone is not a complete sandbox. Before exposing the execution endpoint to untrusted users, execute scripts in separately constrained processes or containers with explicit CPU, memory, and wall-clock limits.
 
 Run the backend tests:
 
