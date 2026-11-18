@@ -83,4 +83,13 @@ class PythonExecutionServiceTest {
         assertTrue(result.success());
         assertEquals("False", result.result());
     }
+
+    @Test
+    void rejectsOversizedSourceCode() {
+        PythonExecutionResult result =
+                executionService.executePython("x".repeat(100_001));
+
+        assertFalse(result.success());
+        assertTrue(result.error().contains("maximum size"));
+    }
 }

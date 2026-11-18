@@ -38,4 +38,14 @@ class GraalVMConfigTest {
         }
         assertEquals("captured", output.toString().trim());
     }
+
+    @Test
+    void deniesEnvironmentLikeAndNativeHostRequests() {
+        try (Context context = contextFactory.createJavaScriptContext(new ByteArrayOutputStream())) {
+            assertThrows(PolyglotException.class,
+                    () -> context.eval("js", "Java.type('java.lang.System').getenv('HOME')"));
+            assertThrows(PolyglotException.class,
+                    () -> context.eval("js", "Java.type('java.lang.Runtime').getRuntime().exec('calc')"));
+        }
+    }
 }

@@ -29,6 +29,18 @@ Installing a separate GraalVM JDK is not needed just to resolve or load the Mave
 
 Host access is explicitly disabled, Java host class lookup is denied, guest IO and native access are disabled, and guest-created threads are disabled. `allowAllAccess(true)` is not used. These settings are a starting boundary, not a complete sandbox for untrusted scripts; additional resource limits and process/container isolation are needed before accepting untrusted workloads.
 
+Day 7 adds configurable source-length, statement, and wall-clock controls:
+
+```properties
+polyglotmesh.security.max-source-length=100000
+polyglotmesh.security.execution-timeout-ms=30000
+polyglotmesh.security.statement-limit=0
+```
+
+JavaScript and Python use separate context factories, request-local output streams, and the same explicit deny-by-default host and IO policy. Resource limits apply through the Polyglot API; context interruption is scheduled for the configured wall-clock timeout. Timeout/cancellation, resource exhaustion, syntax, runtime, and blocked host access are categorized in the language services. A zero statement or timeout value disables that configured limit.
+
+The limits in this repository are application-level safeguards, not proof of isolation from CPU, memory, native runtime, or denial-of-service attacks. Context isolation alone is not a complete sandbox. Production untrusted execution should use separate constrained processes or containers with CPU, memory, output, process, filesystem, network, and wall-clock enforcement. Wall-clock interruption is language/runtime-dependent and must not be treated as a complete DoS defense.
+
 ## JavaScript execution service
 
 `JavaScriptExecutionService.executeJavaScript(String)` evaluates one JavaScript source string and returns a `JavaScriptExecutionResult` with `success`, `result`, `output`, and `error` fields. The result is GraalVM's readable representation of the last evaluated value (for example, `"30"`); scripts that only print have the result `"undefined"`. Console output is captured per request. Syntax and runtime failures return `success: false` and a descriptive error instead of escaping as exceptions.

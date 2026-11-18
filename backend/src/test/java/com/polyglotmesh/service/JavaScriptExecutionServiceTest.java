@@ -76,4 +76,17 @@ class JavaScriptExecutionServiceTest {
         assertTrue(nextExecution.success());
         assertEquals("undefined", nextExecution.result());
     }
+
+    @Test
+    void rejectsOversizedSourceCode() {
+        JavaScriptExecutionResult result =
+                executionService.executeJavaScript("x".repeat(contextMaxLength() + 1));
+
+        assertFalse(result.success());
+        assertTrue(result.error().contains("maximum size"));
+    }
+
+    private int contextMaxLength() {
+        return 100_000;
+    }
 }

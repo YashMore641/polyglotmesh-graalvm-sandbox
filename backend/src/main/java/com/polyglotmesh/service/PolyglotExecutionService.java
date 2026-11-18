@@ -1,6 +1,6 @@
 package com.polyglotmesh.service;
 
-import com.polyglotmesh.dto.ExecutionRequest;
+import com.polyglotmesh.config.GraalVMConfig;
 import com.polyglotmesh.dto.ExecutionResponse;
 import com.polyglotmesh.dto.JavaScriptExecutionResult;
 import com.polyglotmesh.dto.PythonExecutionResult;
@@ -17,12 +17,15 @@ public class PolyglotExecutionService {
 
     private final JavaScriptExecutionService javaScriptExecutionService;
     private final PythonExecutionService pythonExecutionService;
+    private final GraalVMConfig.PolyglotContextFactory contextFactory;
 
     public PolyglotExecutionService(
             JavaScriptExecutionService javaScriptExecutionService,
-            PythonExecutionService pythonExecutionService) {
+            PythonExecutionService pythonExecutionService,
+            GraalVMConfig.PolyglotContextFactory contextFactory) {
         this.javaScriptExecutionService = javaScriptExecutionService;
         this.pythonExecutionService = pythonExecutionService;
+        this.contextFactory = contextFactory;
     }
 
     public ExecutionResponse execute(String language, String code) {
@@ -33,10 +36,11 @@ public class PolyglotExecutionService {
         if (code == null || code.isBlank()) {
             return failure(language.trim().toLowerCase(Locale.ROOT), "Code must not be empty.", startTime);
         }
-        if (code.length() > ExecutionRequest.MAX_CODE_SIZE) {
+        int maxSourceLength = contextFactory.getMaxSourceLength();
+        if (code.length() > maxSourceLength) {
             return failure(
                     language.trim().toLowerCase(Locale.ROOT),
-                    "Code exceeds the maximum size of " + ExecutionRequest.MAX_CODE_SIZE + " characters.",
+                    "Code exceeds the maximum size of " + maxSourceLength + " characters.",
                     startTime);
         }
 

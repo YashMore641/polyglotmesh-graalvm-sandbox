@@ -2,7 +2,7 @@
 
 **PolyglotMesh – GraalVM Multi-Language Runtime Sandbox** is an individual internship project exploring how a backend can safely accept and manage scripts written in multiple languages through a common runtime platform. This repository is organized as a monorepo so the backend, future frontend, documentation, and sample scripts can evolve together.
 
-> **Project status:** Day 6 development. The backend provides health and execution REST endpoints, with a common service for restricted JavaScript and Python execution through GraalVM Polyglot. Persistence and the React frontend are not implemented.
+> **Project status:** Day 7 development. The backend provides health and execution REST endpoints, with a common service for restricted JavaScript and Python execution through GraalVM Polyglot. Execution limits and security boundaries are configurable, while persistence and the React frontend remain unimplemented.
 
 ## Problem statement
 
@@ -189,6 +189,34 @@ ExecutionResponse calculation = polyglotExecutionService.execute("py", "10 + 20"
 ```
 
 Each language-specific service creates and closes a fresh context per execution; guest contexts have no host access, host class lookup, IO, native access, or thread creation. These restrictions do not impose CPU or memory limits: an infinite loop or memory-intensive program can still consume resources or block an application thread. Context isolation alone is not a complete sandbox. Before exposing the execution endpoint to untrusted users, execute scripts in separately constrained processes or containers with explicit CPU, memory, and wall-clock limits.
+
+## Day 7 security boundaries
+
+GraalVM contexts are created separately for JavaScript and Python and are restricted as follows:
+
+- `allowAllAccess(false)` is used; `allowAllAccess(true)` is never enabled.
+- Host access is set to `HostAccess.NONE`.
+- Host class lookup is denied.
+- Guest IO uses `IOAccess.NONE`, so filesystem access and standard process IO are not exposed.
+- Native access and guest-created threads are disabled.
+- JavaScript and Python each receive a separate context-construction path and request-local output stream.
+- Each context shares only the reusable engine; guest bindings and variables do not persist between requests.
+
+The following limits are configurable in `backend/src/main/resources/application.properties`:
+
+```properties
+polyglotmesh.security.max-source-length=100000
+polyglotmesh.security.execution-timeout-ms=30000
+polyglotmesh.security.statement-limit=0
+```
+
+`max-source-length` rejects oversized source in the REST service and language-specific services. `statement-limit` applies GraalVM resource limits to guest execution. `execution-timeout-ms` schedules GraalVM context interruption for the wall-clock timeout when the selected runtime supports context interruption. Set any time or statement limit to `0` to disable that corresponding configured limit.
+
+Timeout, cancellation, resource-exhaustion, syntax, runtime, and security restriction failures are returned as structured execution responses. For example, timeout/cancellation uses `Execution timeout:`, resource exhaustion uses `Execution limit exceeded:`, and blocked host access uses `Security restriction:` where the Polyglot API exposes that category.
+
+These controls reduce accidental or direct host access and provide bounded request validation and guest execution limits. They are not a complete security boundary. GraalVM Context isolation does not guarantee safe CPU, memory, native-process, or denial-of-service isolation. A guest can still consume host CPU or memory, consume large output, trigger runtime bugs, or affect availability in ways not prevented by these limits. Do not expose filesystem, environment variables, network sockets, host processes, or Java host access to guest code.
+
+Before accepting untrusted scripts in production, run each execution in an isolated process or container with enforced CPU, memory, output, process, and wall-clock limits, plus network, filesystem, and privilege restrictions. The timeout behavior depends on guest-language safepoints and the selected GraalVM JDK/runtime, so wall-clock interruption must be defense-in-depth rather than the only limit.
 
 Run the backend tests:
 
