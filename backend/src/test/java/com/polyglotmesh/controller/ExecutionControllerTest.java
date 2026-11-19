@@ -68,8 +68,8 @@ class ExecutionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new RequestBody("ruby", "puts 'Hello'"))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value(
+                .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
+                .andExpect(jsonPath("$.message").value(
                         "Language must be one of: javascript, js, python, py."));
     }
 
@@ -79,8 +79,8 @@ class ExecutionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new RequestBody("python", "  "))))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("Code must not be empty."));
+                        .andExpect(jsonPath("$.error").value("INVALID_REQUEST"))
+                        .andExpect(jsonPath("$.message").value("Code must not be empty."));
     }
 
     @Test
@@ -89,8 +89,9 @@ class ExecutionControllerTest {
         mockMvc.perform(post("/api/execute")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new RequestBody("javascript", code))))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value(
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(jsonPath("$.error").value("CODE_TOO_LARGE"))
+                .andExpect(jsonPath("$.message").value(
                         "Code exceeds the maximum size of 100000 characters."));
     }
 
@@ -100,12 +101,12 @@ class ExecutionControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value(
+                        .andExpect(jsonPath("$.message").value(
                         "Request body must be valid JSON with language and code fields."));
     }
 
     @Test
-    void executionFailureRemainsAnOkHttpResponse() throws Exception {
+    void executionSyntaxFailureReturnsUnprocessableEntity() throws Exception {
         ExecutionResponse response =
                 new ExecutionResponse(false, "javascript", "", "Syntax error: unexpected token", 2);
         when(executionService.execute("javascript", "const = ;")).thenReturn(response);
@@ -113,9 +114,37 @@ class ExecutionControllerTest {
         mockMvc.perform(post("/api/execute")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(new RequestBody("javascript", "const = ;"))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.error").value("Syntax error: unexpected token"));
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("SYNTAX_ERROR"))
+                .andExpect(jsonPath("$.message").value("Syntax error: unexpected token"));
+    }
+
+    @Test
+    void executionTimeoutReturnsGatewayTimeout() throws Exception {
+        ExecutionResponse response =
+                new ExecutionResponse(false, "javascript", "", "Execution timeout: limit reached", 30000);
+        when(executionService.execute("javascript", "while(true){}")).thenReturn(response);
+
+        mockMvc.perform(post("/api/execute")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RequestBody("javascript", "while(true){}"))))
+                .andExpect(status().isGatewayTimeout())
+                .andExpect(jsonPath("$.error").value("EXECUTION_TIMEOUT"))
+                .andExpect(jsonPath("$.message").value("Execution timeout: limit reached"));
+    }
+
+    @Test
+    void runtimeFailureReturnsUnprocessableEntity() throws Exception {
+        ExecutionResponse response =
+                new ExecutionResponse(false, "python", "", "Execution error: division by zero", 2);
+        when(executionService.execute("python", "1 / 0")).thenReturn(response);
+
+        mockMvc.perform(post("/api/execute")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new RequestBody("python", "1 / 0"))))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.error").value("EXECUTION_ERROR"))
+                .andExpect(jsonPath("$.message").value("Execution error: division by zero"));
     }
 
     private record RequestBody(String language, String code) {

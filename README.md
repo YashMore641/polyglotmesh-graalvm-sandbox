@@ -2,7 +2,7 @@
 
 **PolyglotMesh – GraalVM Multi-Language Runtime Sandbox** is an individual internship project exploring how a backend can safely accept and manage scripts written in multiple languages through a common runtime platform. This repository is organized as a monorepo so the backend, future frontend, documentation, and sample scripts can evolve together.
 
-> **Project status:** Day 7 development. The backend provides health and execution REST endpoints, with a common service for restricted JavaScript and Python execution through GraalVM Polyglot. Execution limits and security boundaries are configurable, while persistence and the React frontend remain unimplemented.
+> **Project status:** Day 8 development. The backend provides health and execution REST endpoints, centralized API error responses, common restricted JavaScript and Python execution, and configurable execution limits. Persistence and the React frontend remain unimplemented.
 
 ## Problem statement
 
@@ -169,7 +169,38 @@ Successful requests return HTTP `200 OK` with the execution response:
 }
 ```
 
-Invalid JSON, missing or blank fields, unsupported languages, or code over the size limit return HTTP `400 Bad Request`. The response uses the same fields, with `success` set to `false` and the reason in `error`. A valid request whose code fails during execution (for example, a syntax error) still returns HTTP `200 OK`; inspect `success` and `error` in the response to determine the execution outcome.
+Invalid JSON and Bean Validation failures return HTTP `400 Bad Request`. Oversized code returns HTTP `413 Payload Too Large`. Valid code that fails at execution, including syntax or runtime errors, returns HTTP `422 Unprocessable Entity`. Wall-clock execution interruptions return HTTP `504 Gateway Timeout`. Execution errors use a consistent API error envelope:
+
+```json
+{
+  "timestamp": "2026-11-19T21:17:54.815Z",
+  "status": 422,
+  "error": "SYNTAX_ERROR",
+  "message": "Syntax error: unexpected token",
+  "path": "/api/execute"
+}
+```
+
+Example syntax failure request:
+
+```json
+{
+  "language": "javascript",
+  "code": "const = ;"
+}
+```
+
+Example oversized-code failure response:
+
+```json
+{
+  "timestamp": "2026-11-19T21:17:54.815Z",
+  "status": 413,
+  "error": "CODE_TOO_LARGE",
+  "message": "Code exceeds the maximum size of 100000 characters.",
+  "path": "/api/execute"
+}
+```
 
 ## Common multi-language execution service
 

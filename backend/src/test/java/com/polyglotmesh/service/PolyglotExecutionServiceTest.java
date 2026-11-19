@@ -32,7 +32,7 @@ class PolyglotExecutionServiceTest {
     void executesPythonAlias() {
         ExecutionResponse response = executionService.execute("py", "print(10 + 20)");
 
-        assertTrue(response.success());
+        assertTrue(response.success(), response.error());
         assertEquals("py", response.language());
         assertEquals("30\n", response.output());
         assertTrue(response.executionTimeMs() >= 0);
@@ -53,7 +53,7 @@ class PolyglotExecutionServiceTest {
 
         assertFalse(response.success());
         assertNotNull(response.error());
-        assertTrue(response.error().startsWith("Syntax error: "));
+        assertTrue(response.error().startsWith("Syntax error: "), response.error());
     }
 
     @Test

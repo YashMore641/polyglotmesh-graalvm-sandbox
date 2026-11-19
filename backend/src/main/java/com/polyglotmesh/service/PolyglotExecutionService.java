@@ -63,12 +63,7 @@ public class PolyglotExecutionService {
             };
         } catch (RuntimeException exception) {
             logger.error("Unexpected failure while executing {} code.", normalizedLanguage, exception);
-            return failure(
-                    normalizedLanguage,
-                    "Execution failed: " + (exception.getMessage() == null
-                            ? exception.getClass().getSimpleName()
-                            : exception.getMessage()),
-                    startTime);
+            return failure(normalizedLanguage, "Execution error: The code could not be executed.", startTime);
         }
     }
 

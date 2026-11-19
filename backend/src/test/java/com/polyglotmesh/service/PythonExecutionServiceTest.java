@@ -21,7 +21,7 @@ class PythonExecutionServiceTest {
     void capturesPrintOutput() {
         PythonExecutionResult result = executionService.executePython("print(\"Hello from Python\")");
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.error());
         assertEquals("Hello from Python", result.output().trim());
         assertNull(result.result());
         assertNull(result.error());
@@ -31,7 +31,7 @@ class PythonExecutionServiceTest {
     void capturesPrintedArithmetic() {
         PythonExecutionResult result = executionService.executePython("print(10 + 20)");
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.error());
         assertEquals("30", result.output().trim());
         assertNull(result.result());
     }
@@ -41,7 +41,7 @@ class PythonExecutionServiceTest {
         PythonExecutionResult result =
                 executionService.executePython("numbers = [10, 20, 30]\nprint(sum(numbers))");
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.error());
         assertEquals("60", result.output().trim());
     }
 
@@ -52,14 +52,14 @@ class PythonExecutionServiceTest {
         assertFalse(result.success());
         assertNull(result.result());
         assertNotNull(result.error());
-        assertTrue(result.error().startsWith("Syntax error: "));
+        assertTrue(result.error().startsWith("Syntax error: "), result.error());
     }
 
     @Test
     void returnsExpressionResult() {
         PythonExecutionResult result = executionService.executePython("10 + 20");
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.error());
         assertEquals("30", result.result());
         assertEquals("", result.output());
     }
@@ -70,7 +70,7 @@ class PythonExecutionServiceTest {
 
         assertFalse(result.success());
         assertNull(result.result());
-        assertTrue(result.error().startsWith("Execution error: "));
+        assertTrue(result.error().startsWith("Execution error: "), result.error());
         assertTrue(result.error().contains("division"));
     }
 
@@ -80,7 +80,7 @@ class PythonExecutionServiceTest {
 
         PythonExecutionResult result = executionService.executePython("'request_local' in globals()");
 
-        assertTrue(result.success());
+        assertTrue(result.success(), result.error());
         assertEquals("False", result.result());
     }
 

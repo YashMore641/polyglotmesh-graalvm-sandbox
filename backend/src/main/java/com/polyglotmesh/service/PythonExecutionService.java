@@ -38,6 +38,10 @@ public class PythonExecutionService {
                     "Code exceeds the maximum size of " + maxSourceLength + " characters.");
         }
 
+        return executePythonAttempt(code);
+    }
+
+    private PythonExecutionResult executePythonAttempt(String code) {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         ScheduledExecutorService timeoutExecutor = Executors.newSingleThreadScheduledExecutor();
         try (Context context = contextFactory.createPythonContext(output)) {
