@@ -54,6 +54,17 @@ public class ApiExceptionHandler {
         return error(HttpStatus.PAYLOAD_TOO_LARGE, "CODE_TOO_LARGE", exception.getMessage());
     }
 
+    @ExceptionHandler(InteroperabilityException.class)
+    public ResponseEntity<ApiErrorResponse> handleInteroperabilityFailure(
+            InteroperabilityException exception) {
+        return ResponseEntity.status(exception.getStatus()).body(new ApiErrorResponse(
+                Instant.now(),
+                exception.getStatus().value(),
+                exception.getErrorCode(),
+                exception.getMessage(),
+                "/api/interop"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiErrorResponse> handleUnexpected(
             Exception exception) {
@@ -71,19 +82,30 @@ public class ApiExceptionHandler {
                 ? HttpStatus.PAYLOAD_TOO_LARGE
                 : HttpStatus.BAD_REQUEST;
         String errorCode = status == HttpStatus.PAYLOAD_TOO_LARGE ? "CODE_TOO_LARGE" : "INVALID_REQUEST";
-        return error(status, errorCode, message);
+        boolean interoperabilityRequest = bindingResult.getFieldErrors().stream()
+                .anyMatch(fieldError -> fieldError.getField().startsWith("source")
+                        || fieldError.getField().startsWith("target"));
+        return error(status, errorCode, message, interoperabilityRequest ? "/api/interop" : "/api/execute");
     }
 
     private ResponseEntity<ApiErrorResponse> error(
             HttpStatus status,
             String error,
             String message) {
+        return error(status, error, message, "/api/execute");
+    }
+
+    private ResponseEntity<ApiErrorResponse> error(
+            HttpStatus status,
+            String error,
+            String message,
+            String path) {
         ApiErrorResponse response = new ApiErrorResponse(
                 Instant.now(),
                 status.value(),
                 error,
                 message,
-                "/api/execute");
+                path);
         return ResponseEntity.status(status).body(response);
     }
 }

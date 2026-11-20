@@ -2,7 +2,7 @@
 
 **PolyglotMesh – GraalVM Multi-Language Runtime Sandbox** is an individual internship project exploring how a backend can safely accept and manage scripts written in multiple languages through a common runtime platform. This repository is organized as a monorepo so the backend, future frontend, documentation, and sample scripts can evolve together.
 
-> **Project status:** Day 8 development. The backend provides health and execution REST endpoints, centralized API error responses, common restricted JavaScript and Python execution, and configurable execution limits. Persistence and the React frontend remain unimplemented.
+> **Project status:** Day 9 development. The backend provides health and execution REST endpoints, restricted JavaScript and Python execution, configurable execution limits, and an experimental JavaScript–Python primitive-value interoperability endpoint. Persistence and the React frontend remain unimplemented.
 
 ## Problem statement
 
@@ -18,6 +18,7 @@ Running scripts from different programming languages often requires separate run
 - Execute Python through a restricted, isolated GraalVM Polyglot context.
 - Route JavaScript and Python requests through a common language execution service.
 - Expose JavaScript and Python execution through a validated REST endpoint.
+- Experiment with safe JavaScript–Python primitive value exchange through Java.
 - Keep database integration out of the current backend.
 
 ## Repository layout
@@ -220,6 +221,23 @@ ExecutionResponse calculation = polyglotExecutionService.execute("py", "10 + 20"
 ```
 
 Each language-specific service creates and closes a fresh context per execution; guest contexts have no host access, host class lookup, IO, native access, or thread creation. These restrictions do not impose CPU or memory limits: an infinite loop or memory-intensive program can still consume resources or block an application thread. Context isolation alone is not a complete sandbox. Before exposing the execution endpoint to untrusted users, execute scripts in separately constrained processes or containers with explicit CPU, memory, and wall-clock limits.
+
+## Experimental JavaScript–Python interoperability
+
+`POST /api/interop` is an experimental route separate from `/api/execute`. It evaluates source code in one restricted, request-local language context, transfers only a supported primitive through Java, and binds it as `sharedValue` in a separate context for the target language.
+
+```json
+{
+  "sourceLanguage": "javascript",
+  "sourceCode": "21 * 2",
+  "targetLanguage": "python",
+  "targetCode": "sharedValue + 1"
+}
+```
+
+The response reports the transferred type and value plus the target expression result; guest console output is discarded. The reverse direction and string values are supported as well. Only strings and finite numbers exactly representable as a Java `double` are accepted; booleans, null/undefined, collections, functions, guest objects, and out-of-range or imprecise numbers are rejected. Guest `Value` objects are never passed directly between contexts. The Java bridge converts the source result to a Java `String` or `Double`, then supplies that primitive to the other guest context. Host access remains disabled.
+
+This feature uses the existing GraalVM Polyglot API, GraalJS, and GraalPy `24.1.2` dependencies. The interoperability tests exercise Java-mediated primitive bindings using those resolved versions. It does not imply direct sharing of arbitrary JS/Python objects or guarantee safe execution of untrusted scripts; the normal execution security and process-isolation caveats continue to apply.
 
 ## Day 7 security boundaries
 

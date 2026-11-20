@@ -90,6 +90,14 @@ The automated tests verify these examples, syntax and runtime error reporting, a
 
 Language execution uses a new, restricted context for each call and closes it after evaluation. This does not impose CPU, memory, or wall-clock limits. Guest scripts can still run indefinitely or consume excessive memory, so context isolation and disabled host access are not sufficient protections for untrusted workloads. Add process/container isolation and explicit resource limits before accepting untrusted code.
 
+## Experimental JavaScript–Python value exchange
+
+`LanguageInteroperabilityService` uses separate JS-only and Python-only contexts created with the same restricted context factory; it does not rely on one guest language accessing another language's bindings. The source expression is evaluated first. Its GraalVM `Value` is checked and converted in Java to either a `String` or a finite `double` that the Polyglot API reports as exactly representable. Java then sets the primitive in the target context's language bindings under the name `sharedValue`, and evaluates the target expression.
+
+For example, `POST /api/interop` can evaluate `21 * 2` in JavaScript and `sharedValue + 1` in Python. `POST /api/execute` remains unchanged and does not invoke this service. The supported transfer types are strings and finite, double-representable numbers. Booleans, null/undefined, arrays/lists, maps/dictionaries, functions, arbitrary guest objects, and numbers that cannot be represented without loss are rejected. String values are capped at the configured maximum source length. Guest console output is discarded; the response contains the transferred primitive and target expression result. Evaluation and conversion failures are returned as structured API errors.
+
+This Java-mediated approach deliberately avoids transferring GraalVM `Value` instances or assuming that objects from one guest runtime are safe or usable in the other. It uses `Context.getBindings(...).putMember(...)` to provide a Java primitive to the destination guest; it does not enable host access or host class lookup. The integration tests exercise this path against the project's aligned Polyglot, GraalJS, and GraalPy `24.1.2` dependencies. This is a narrow demonstration, not a general-purpose serializer or an expanded sandbox guarantee.
+
 ## References
 
 - [GraalVM: Embedding Languages](https://www.graalvm.org/latest/reference-manual/embed-languages/) — Maven dependency setup, language POM artifacts, and context lifecycle.
